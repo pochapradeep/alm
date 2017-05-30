@@ -1,11 +1,15 @@
 package com.lp.alm.oslc.client.jazz;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Date;
 import java.util.List;
 
+import javax.servlet.ServletException;
 import javax.xml.namespace.QName;
 
 import org.apache.http.HttpStatus;
@@ -15,11 +19,23 @@ import org.eclipse.lyo.oslc4j.core.model.CreationFactory;
 import org.eclipse.lyo.oslc4j.core.model.OslcMediaType;
 import org.eclipse.lyo.oslc4j.core.model.Property;
 import org.eclipse.lyo.oslc4j.core.model.ResourceShape;
+import org.joda.time.DateTime;
 import org.junit.Test;
 
 import com.atlassian.jira.rest.client.api.IssueRestClient;
 import com.atlassian.jira.rest.client.api.JiraRestClient;
 import com.atlassian.jira.rest.client.api.domain.Issue;
+import com.ibm.team.process.client.IProcessClientService;
+import com.ibm.team.repository.client.ITeamRepository;
+import com.ibm.team.repository.client.TeamPlatform;
+import com.ibm.team.repository.common.TeamRepositoryException;
+import com.ibm.team.repository.client.ITeamRepository.ILoginHandler;
+import com.ibm.team.repository.client.ITeamRepository.ILoginHandler.ILoginInfo;
+import com.ibm.team.workitem.client.IAuditableClient;
+import com.ibm.team.workitem.client.IWorkItemClient;
+import com.ibm.team.workitem.common.model.IWorkItem;
+import com.lp.alm.adapter.client.pojo.jazz.ModifyWorkItem;
+import com.lp.alm.adapter.properties.PropertiesCache;
 import com.lp.alm.adapter.resources.ArtifactInputParameters;
 import com.lp.alm.adapter.rest.client.api.JazzClientFactory;
 import com.lp.alm.adapter.rest.client.api.JiraClientFactory;
@@ -29,6 +45,7 @@ import com.lp.alm.lyo.client.oslc.OSLCConstants;
 import com.lp.alm.lyo.client.oslc.jazz.JazzFormAuthClient;
 import com.lp.alm.lyo.client.oslc.jazz.JazzRootServicesHelper;
 import com.lp.alm.lyo.client.oslc.resources.ChangeRequest;
+import com.lp.alm.oslc.client.jira.JiraArtifactBuilder;
 
 import junit.framework.Assert;
 
@@ -46,7 +63,7 @@ public class JazzArtifactBuilderTest {
 	
 	
 	
-	@Test
+//	@Test
 	public void testPriorityAllowedvaluesInRTC() throws Exception{
 		
 		JazzFormAuthClient jazzRestClient = JazzClientFactory.jazzRestClient();
@@ -115,7 +132,7 @@ public class JazzArtifactBuilderTest {
 	}
 	
 	
-	@Test
+//	@Test
 	public void testFiledAgainstAllowedvaluesInRTC() throws Exception{
 		
 //		JazzFormAuthClient jazzRestClient = JazzArtifactBuilder.getJazzRestClient();
@@ -132,7 +149,61 @@ public class JazzArtifactBuilderTest {
 	}
 	
 	
+	
 	@Test
+	public void testModifyWorkItem() throws URISyntaxException, IOException, ServletException, TeamRepositoryException{
+
+		JiraRestClient jiraRestClient = JiraClientFactory.getJiraRestClient();
+		final IssueRestClient issueClient = jiraRestClient.getIssueClient();
+		String issueKey2 = "PM-31";
+		final Issue createdIssue = issueClient.getIssue(issueKey2).claim();//LOYAL-37
+		assertNotNull(createdIssue);
+		ChangeRequest cr = new ChangeRequest();
+		java.sql.Timestamp dueDate = new java.sql.Timestamp(new Date().getTime());
+		String title = "Updated Title";
+		cr.setTitle(title);
+		String description = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
+		cr.setDescription(description);
+		String priority = "Low";
+		cr.setPriority(priority);
+		cr.setAcceptanceCriteria(description+"-updated");
+		String remoteIssueLink = JiraArtifactBuilder.getValueFromCustomField(createdIssue,
+				com.lp.alm.adapter.constants.OSLCConstants.STRING_CUSTOM_FIELD_EXT_LINKS);
+		int workItemId = ModifyWorkItem.executePush(remoteIssueLink, cr.getPriority(), createdIssue.getKey(), cr.getAcceptanceCriteria(), cr.getTitle(), dueDate, cr.getDescription());
+
+		
+		String repositoryURI = PropertiesCache.getInstance().getProperty("jazz_cm_root_services");
+		String userId = PropertiesCache.getInstance().getProperty("jazz_admin_username");
+		String password = PropertiesCache.getInstance().getProperty("jazz_admin_password");
+		String projectAreaName = com.lp.alm.adapter.constants.OSLCConstants.PROJECT[1];
+		TeamPlatform.startup();
+
+
+		ITeamRepository teamRepository = TeamPlatform
+				.getTeamRepositoryService().getTeamRepository(repositoryURI);
+		teamRepository.registerLoginHandler(new LoginHandler(userId, password));
+		teamRepository.login(null);
+
+		IProcessClientService processClient = (IProcessClientService) teamRepository
+				.getClientLibrary(IProcessClientService.class);
+		IAuditableClient auditableClient = (IAuditableClient) teamRepository
+				.getClientLibrary(IAuditableClient.class);
+		IWorkItemClient workItemClient = (IWorkItemClient) teamRepository
+				.getClientLibrary(IWorkItemClient.class);
+		
+		int id = new Integer(workItemId).intValue();
+
+		IWorkItem workItem = workItemClient.findWorkItemById(id,
+				IWorkItem.SMALL_PROFILE, null);
+		
+		assertEquals(workItem.getHTMLSummary().getPlainText(),title);
+		assertEquals(workItem.getHTMLDescription().getPlainText(),description);
+
+		TeamPlatform.shutdown();
+
+	}
+	
+//	@Test
 	public void testToInputParameters() throws URISyntaxException{
 //		sync_fields=Summary,Description,Priority,Status,IssueType,Due Date,Resolution
 
@@ -141,7 +212,7 @@ public class JazzArtifactBuilderTest {
 		String issueKey2 = "LOYAL-92";
 		final Issue createdIssue = issueClient.getIssue(issueKey2).claim();//LOYAL-37
 		assertNotNull(createdIssue);
-		List<String> selectedFields = AdapterUtils.getSelectedFields();
+		List<String> selectedFields = AdapterUtils.getSelectedFields(com.lp.alm.adapter.constants.OSLCConstants.SYNC_FIELDS);
 		ChangeRequest changeRequest = ArtifactInputParameters.toIssueParameters(createdIssue, selectedFields);
 		assertNotNull(changeRequest.getTitle());
 		assertNotNull(changeRequest.getDescription());
@@ -150,5 +221,26 @@ public class JazzArtifactBuilderTest {
 
 		
 	}
-	
+	private static class LoginHandler implements ILoginHandler, ILoginInfo {
+
+		private String fUserId;
+		private String fPassword;
+
+		private LoginHandler(String userId, String password) {
+			fUserId = userId;
+			fPassword = password;
+		}
+
+		public String getUserId() {
+			return fUserId;
+		}
+
+		public String getPassword() {
+			return fPassword;
+		}
+
+		public ILoginInfo challenge(ITeamRepository repository) {
+			return this;
+		}
+	}
 }

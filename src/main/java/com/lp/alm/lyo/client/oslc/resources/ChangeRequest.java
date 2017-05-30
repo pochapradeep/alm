@@ -42,6 +42,7 @@ import org.eclipse.lyo.oslc4j.core.model.Link;
 import org.eclipse.lyo.oslc4j.core.model.Occurs;
 import org.eclipse.lyo.oslc4j.core.model.OslcConstants;
 import org.eclipse.lyo.oslc4j.core.model.ValueType;
+import org.joda.time.DateTime;
 
 @OslcNamespace(CmConstants.CHANGE_MANAGEMENT_NAMESPACE)
 @OslcResourceShape(title = "Change Request Resource Shape", describes = CmConstants.TYPE_CHANGE_REQUEST)
@@ -102,8 +103,23 @@ public final class ChangeRequest
 	}
 
 	private String workItemType;
+	private String priority;
+	private String acceptanceCriteria;
+	private DateTime dueDate;
 
-    public String getWorkItemType() {
+    public void setDueDate(DateTime dueDate) {
+		this.dueDate = dueDate;
+	}
+
+	public void setAcceptanceCriteria(String acceptanceCriteria) {
+		this.acceptanceCriteria = acceptanceCriteria;
+	}
+
+	public void setPriority(String priority) {
+		this.priority = priority;
+	}
+
+	public String getWorkItemType() {
 		return workItemType;
 	}
 
@@ -114,7 +130,9 @@ public final class ChangeRequest
 	public static final String DEFECT = "defect";
     public static final String TASK = "task";
     public static final String EPIC = "epic";
-    public static final String STORY = "planItem";
+//    public static final String STORY = "planItem";
+    public static final String STORY = "com.ibm.team.apt.workItemType.story";
+    public static final String PRIORITY_HIGH = "High";
     
     public ChangeRequest()
            throws URISyntaxException
@@ -894,4 +912,19 @@ public final class ChangeRequest
     {
         this.verified = verified;
     }
+
+	public String getPriority() {
+		// TODO Auto-generated method stub
+		return this.priority;
+	}
+
+	public String getAcceptanceCriteria() {
+		// TODO Auto-generated method stub
+		return this.acceptanceCriteria;
+	}
+
+	public DateTime getDueDate() {
+		// TODO Auto-generated method stub
+		return this.dueDate;
+	}
 }

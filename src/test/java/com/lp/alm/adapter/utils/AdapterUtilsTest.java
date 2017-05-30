@@ -8,7 +8,7 @@ import com.lp.alm.adapter.constants.OSLCConstants;
 
 public class AdapterUtilsTest {
 	
-	@Test
+//	@Test
 	public void testConvertToRespectiveInterfaceValueForStatus(){
 		String propertyKey = "status";
 		

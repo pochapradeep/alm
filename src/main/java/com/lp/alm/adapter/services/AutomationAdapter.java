@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.atlassian.jira.rest.client.api.domain.Issue;
+import com.lp.alm.adapter.constants.OSLCConstants;
 import com.lp.alm.adapter.utils.AdapterUtils;
 import com.lp.alm.lyo.client.exception.RootServicesException;
 import com.lp.alm.lyo.client.oslc.resources.ChangeRequest;
@@ -43,17 +44,20 @@ public class AutomationAdapter {
 	}
 
 	public static void performRTCToJiraSync() throws URISyntaxException {
+
+		logger.info("RTC polling service started ");
 		List<ChangeRequest> latestIssues = JazzArtifactBuilder.getLatestIssues();
 		if (latestIssues.isEmpty()) {
+			logger.info("No modified Items found");
 			return;
 		}
 		if (!anyIssueStatusNotInSync(latestIssues)) {
 			return;
 		}
-
+		logger.info("Found RTC workitem status which needs to be synced");
 		for (ChangeRequest cr : latestIssues) {
 			logger.debug("Issue Status " + cr.getStatus());
-			if (JazzArtifactBuilder.isQualifiedForPush(cr)) {
+//			if (JazzArtifactBuilder.isQualifiedForPush(cr)) {
 				String status = AdapterUtils.convertToJiraEq(cr.getStatus());
 				if (JiraArtifactBuilder.isAttributeInSync(status, cr.getExternal_link())) {
 					continue;
@@ -61,7 +65,7 @@ public class AutomationAdapter {
 					JiraArtifactBuilder.pushToRemoteJiraSystem(cr.getExternal_link(), status);
 
 				}
-			}
+//			}
 		}
 
 	}
@@ -83,7 +87,7 @@ public class AutomationAdapter {
 
 	public static void performJiraToRTCSync()
 			throws URISyntaxException, IOException, ServletException, RootServicesException {
-		logger.debug("Polling service started ......");
+		logger.debug("Jira polling service started ......");
 
 		List<Issue> latestCreatedIssues = JiraArtifactBuilder.getLatestCreatedIssues();
 		List<Issue> latestUpdatedIssues = JiraArtifactBuilder.getLatestModifiedIssues();
@@ -97,20 +101,18 @@ public class AutomationAdapter {
 
 		pushIssues(latestUpdatedIssues);
 
-		logger.debug("Polling service complete. Now existing. ");
+		logger.debug("Jira polling service complete. Now existing. ");
 	}
 
-	public static void pushIssues(List<Issue> latestIssues)
-			throws IOException, ServletException, URISyntaxException {
+	public static void pushIssues(List<Issue> latestIssues) throws IOException, ServletException, URISyntaxException {
 		for (Issue issue : latestIssues) {
-			logger.debug("Issue Summary " + issue.getSummary());
-			pushToRemoteJazzSystem(issue);
-			logger.debug("A New artifact has been pushed: "+issue.getKey());
+			logger.info(" Found a jira item which would be pushed " + issue.getSummary());
+			pushToRemoteJazzSystemV2(issue);
+			logger.debug("A New artifact has been pushed: " + issue.getKey());
 		}
 	}
 
-	public static void pushToRemoteJazzSystem(Issue issue)
-			throws IOException, ServletException, URISyntaxException {
+	public static void pushToRemoteJazzSystem(Issue issue) throws IOException, ServletException, URISyntaxException {
 
 		ClientResponse clientResponse = JazzArtifactBuilder.createOrUpdateIssueInRTC(issue);
 		if (clientResponse == null || clientResponse.getStatusCode() != HttpStatus.SC_CREATED
@@ -118,10 +120,23 @@ public class AutomationAdapter {
 			System.err.println("ERROR: Could not create the task \n");
 		} else {
 			String changeRequestLocation = clientResponse.getHeaders().getFirst(HttpHeaders.LOCATION);
-			JiraArtifactBuilder.addOslcLinkToJiraV2(changeRequestLocation,
-					issue);
+			JiraArtifactBuilder.addOslcLinkToJiraV2(changeRequestLocation, issue);
 
 		}
+	}
+
+	public static int pushToRemoteJazzSystemV2(Issue issue) throws IOException, ServletException, URISyntaxException {
+		
+		int rtcWorkItemId;
+		String remoteIssueLink = JiraArtifactBuilder.getValueFromCustomField(issue,
+				OSLCConstants.STRING_CUSTOM_FIELD_EXT_LINKS);
+		if (remoteIssueLink != null) {
+			rtcWorkItemId = JazzArtifactBuilder.updateIssueInRTCV2(remoteIssueLink,issue);
+		}else{
+			rtcWorkItemId = JazzArtifactBuilder.createIssueInRTCV2(issue);
+		}
+		
+		return rtcWorkItemId;
 	}
 
 }

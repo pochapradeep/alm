@@ -1,11 +1,16 @@
 package com.lp.alm.oslc.client.jazz;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.servlet.ServletException;
+
+import org.apache.http.HttpHeaders;
 import org.apache.wink.client.ClientResponse;
 import org.eclipse.lyo.oslc4j.core.model.AllowedValues;
 import org.eclipse.lyo.oslc4j.core.model.CreationFactory;
@@ -20,6 +25,8 @@ import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
+import com.lp.alm.adapter.client.pojo.jazz.CreateWorkItem;
+import com.lp.alm.adapter.client.pojo.jazz.ModifyWorkItem;
 import com.lp.alm.adapter.constants.OSLCConstants;
 import com.lp.alm.adapter.resources.ArtifactInputParameters;
 import com.lp.alm.adapter.rest.client.api.JazzClientFactory;
@@ -50,7 +57,7 @@ public class JazzArtifactBuilder implements ArtifactBuilder {
 
 		logger.info("issue is being pushed to Jazz ");
 		
-		List<String> selectedFields = AdapterUtils.getSelectedFields();
+		List<String> selectedFields = AdapterUtils.getSelectedFields(OSLCConstants.SYNC_FIELDS);
 		ChangeRequest cr = ArtifactInputParameters.toIssueParameters(issue, selectedFields);
 
 
@@ -83,6 +90,30 @@ public class JazzArtifactBuilder implements ArtifactBuilder {
 		ClientResponse writeToExternalSystem = HTTP.writeToExternalSystem(cr,
 				OSLCConstants.PROJECT[OSLCConstants.RTC_OFFSET]);
 		return writeToExternalSystem;
+
+	}
+	
+	
+	public static int createIssueInRTCV2(Issue issue) throws URISyntaxException, IOException, ServletException {
+
+		logger.info("Jira Item is being pushed to Jazz ");
+		
+		List<String> selectedFields = AdapterUtils.getSelectedFields(OSLCConstants.SYNC_FIELDS);
+		ChangeRequest cr = ArtifactInputParameters.toIssueParameters(issue, selectedFields);
+		
+		java.sql.Timestamp dueDate = null;
+		if(cr.getDueDate()!=null){
+			dueDate = new java.sql.Timestamp(cr.getDueDate().getMillis());
+		}
+		int workItemId = CreateWorkItem.executePush(cr.getWorkItemType(), cr.getPriority(), issue.getKey(), cr.getAcceptanceCriteria(), cr.getTitle(), dueDate, cr.getDescription());
+		if(workItemId!=-1){
+			logger.info("successfully pushed an jira item to RTC ,item id is "+workItemId);
+			JiraArtifactBuilder.addOslcLinkToJiraV2(String.valueOf(workItemId),
+					issue);
+		
+		}
+		
+		return workItemId;
 
 	}
 
@@ -126,12 +157,55 @@ public class JazzArtifactBuilder implements ArtifactBuilder {
 		}
 		return crList;
 	}
+	
+	   /**
+	    * method to get the latest issues from RTC ,
+	    * all issues updated recently would be collected and returned.
+	    * @return list of updated artifacts.
+	    */
+		public static List<ChangeRequest> getLatestIssuesV2() {
+
+			// TODO the below method to be refactored to use RTC java plain api libraries.
+			List<ChangeRequest> crList = new ArrayList();
+
+			OslcQueryParameters queryParams2 = new OslcQueryParameters();
+			String timerFrequency = OSLCConstants.RTC_POLLING_FREQUENCY;
+			String pollingFrequency = OPEN_BRACES + timerFrequency + CLOSE_BRACES;
+			queryParams2.setWhere(DCTERMS_MODIFIED + pollingFrequency + ESCAPE_SEQ);
+
+			logger.debug("format time is " + pollingFrequency);
+			logger.debug("queryParams is " + queryParams2);
+
+			OslcQuery query2 = new OslcQuery(JazzClientFactory.jazzRestClient(), JazzClientFactory.getQueryCapability(),
+					queryParams2);
+
+			OslcQueryResult result2 = query2.submit();
+			for (String resultsUrl : result2.getMembersUrls()) {
+				System.out.println(resultsUrl);
+
+				ClientResponse response = null;
+				try {
+					// Get a single artifact by its URL
+					response = JazzClientFactory.jazzRestClient().getResource(resultsUrl, APPLICATION_RDF_XML);
+					if (response != null) {
+						// De-serialize it as a Java object
+						ChangeRequest cr = response.getEntity(ChangeRequest.class);
+						crList.add(cr);
+						System.out.println(" cr " + cr.getTitle());
+					}
+				} catch (Exception e) {
+					logger.error("Unable to process artfiact at url: " + resultsUrl, e);
+				}
+			}
+			return crList;
+		}
+
 
 	public static boolean isQualifiedForPush(ChangeRequest cr) {
 		if (cr.getExternal_link() == null) {
 			return false;
 		}
-		if (cr.getStatus() == NEW) {
+		if (cr.getStatus().equals(NEW)) {
 			return false;
 		}
 
@@ -204,6 +278,24 @@ public class JazzArtifactBuilder implements ArtifactBuilder {
 			}
 		}
 		return false;
+	}
+
+
+	public static int updateIssueInRTCV2(String rtcWorkItemID,Issue issue) throws URISyntaxException {
+
+		logger.info("Jira Item is being pushed to Jazz ");
+		
+		List<String> selectedFields = AdapterUtils.getSelectedFields(OSLCConstants.SYNC_FIELDS);
+		ChangeRequest cr = ArtifactInputParameters.toIssueParameters(issue, selectedFields);
+		
+		java.sql.Timestamp dueDate = null;
+		if(cr.getDueDate()!=null){
+			dueDate = new java.sql.Timestamp(cr.getDueDate().getMillis());
+		}
+		int workItemId = ModifyWorkItem.executePush(rtcWorkItemID, cr.getPriority(), issue.getKey(), cr.getAcceptanceCriteria(), cr.getTitle(), dueDate, cr.getDescription());
+		
+		return workItemId;
+
 	}
 
 }

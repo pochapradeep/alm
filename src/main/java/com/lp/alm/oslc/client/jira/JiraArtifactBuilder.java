@@ -26,26 +26,16 @@ import com.lp.alm.adapter.rest.client.api.JiraClientFactory;
 public class JiraArtifactBuilder implements ArtifactBuilder {
 
 	final static Logger logger = LoggerFactory.getLogger(JiraArtifactBuilder.class);
-//	private static JiraRestClient client;
-
-/*	static {
-		try {
-			client = JiraClientFactory.getJiraRestClient();
-			logger.info("Jira client successfully created !");
-		} catch (URISyntaxException e) {
-			logger.error("**** Error while created JIRA Client ***** ");
-			e.printStackTrace();
-		}
-
-	}*/
 
 	public static Response addOslcLinkToJiraV2(final String URItoAdd,
 			Issue issue) throws IOException, ServletException {
 		try {
+			logger.info("RTC item id is being updated in JIRA ");
 			IssueField fieldByName = issue.getFieldByName(OSLCConstants.STRING_CUSTOM_FIELD_EXT_LINKS);
 			final IssueInputBuilder issueInputBuilder = new IssueInputBuilder().setFieldValue(fieldByName.getId(),
 					URItoAdd);
 			JiraClientFactory.getJiraRestClient().getIssueClient().updateIssue(issue.getKey(), issueInputBuilder.build()).claim();
+			logger.info("success..... RTC item id is updated in JIRA ");
 
 			return Response.ok().build();
 
@@ -60,16 +50,6 @@ public class JiraArtifactBuilder implements ArtifactBuilder {
 		return (issue.getFieldByName(customerField) != null) ? (String) issue.getFieldByName(customerField).getValue()
 				: null;
 	}
-
-/*	public static Promise<SearchResult> getLatestIssues() {
-
-		for (BasicProject project : client.getProjectClient().getAllProjects().claim()) {
-			System.out.println(project.getKey() + ": " + project.getName());
-		}
-		Promise<SearchResult> searchJqlPromise = client.getSearchClient()
-				.searchJql(OSLCConstants.JQL_MODIFIED_ISSUES_QUERY);
-		return searchJqlPromise;
-	}*/
 
 	public static List<Issue> getLatestCreatedIssues() throws URISyntaxException {
 		List<Issue> issueList = new ArrayList();
@@ -114,17 +94,6 @@ public class JiraArtifactBuilder implements ArtifactBuilder {
 
 	}
 
-/*	public static String convertToJiraEq(String status) {
-
-		String[] transition = PropertiesCache.getInstance().getProperty("status").split(PropertiesCache.DELIMTER);
-		for (String stage : transition) {
-			String[] lookup = PropertiesCache.getInstance().getProperty(stage).split(PropertiesCache.DELIMTER);
-			if (status.equals(lookup[OSLCConstants.RTC_OFFSET])) {
-				return lookup[OSLCConstants.JIRA_OFFSET];
-			}
-		}
-		return "";
-	}*/
 
 	public static void pushToRemoteJiraSystem(String issueKey, String status) {
 
@@ -140,7 +109,7 @@ public class JiraArtifactBuilder implements ArtifactBuilder {
 			logger.info("No transistion found for status " + status);
 			return;
 		}
-		logger.debug(" startProgressTransition is " + startProgressTransition);
+		logger.info(" udpating the status in JIRA for issue"+ syncIssue.getKey()+" to staus " + startProgressTransition);
 		issueClient.transition(syncIssue.getTransitionsUri(), new TransitionInput(startProgressTransition.getId()))
 				.claim();
 

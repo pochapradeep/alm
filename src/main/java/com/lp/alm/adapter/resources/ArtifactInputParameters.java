@@ -56,6 +56,9 @@ public class ArtifactInputParameters {
 		// priority
 		if (AdapterUtils.allowUpdate(selectedProperties, OSLCConstants.JIRA_TYPE_PRIORITY)) {
 			BasicPriority priority = issue.getPriority();
+			
+			String mappedPriority = AdapterUtils.convertToRespectiveInterfaceValue("priority", priority.getName(), OSLCConstants.JIRA_OFFSET);
+			changeRequest.setPriority(mappedPriority);
 			// TODO determine method to set the priority.
 		}
 
@@ -92,7 +95,7 @@ public class ArtifactInputParameters {
 
 		// duedate
 		if (AdapterUtils.allowUpdate(selectedProperties, OSLCConstants.DCTERMS_DUEDATE)) {
-			// TODO
+			changeRequest.setDueDate(issue.getDueDate());
 		}
 
 		// resolution
@@ -105,6 +108,12 @@ public class ArtifactInputParameters {
 
 		// custom fields
 		if (AdapterUtils.allowUpdate(selectedProperties, OSLCConstants.JIRA_TYPE_CUSTOM_FIELD)) {
+			List<String> custFields = AdapterUtils.getSelectedFields(OSLCConstants.CUST_FIELDS);
+			if (AdapterUtils.allowUpdate(custFields, OSLCConstants.ACCEPTANCE_CRITERIA)) {
+				String acceptCriteria = JiraArtifactBuilder.getValueFromCustomField(issue, OSLCConstants.STRING_CUSTOM_FIELD_ACCEPTANCE_CRITERIA);
+				changeRequest.setAcceptanceCriteria(acceptCriteria);
+			}
+
 
 		}
 

@@ -12,8 +12,14 @@ public interface OSLCConstants {
 	
 	
 	public final String JIRA_PROJECT = PropertiesCache.getInstance().getPropertyFor("project")[0];
-	public final String JQL_MODIFIED_ISSUES_QUERY = "project = "+JIRA_PROJECT+" AND updated > '-1m' AND created < '-1m' and not status changed during (-1m,now())";
-	public final String JQL_CREATED_ISSUES_QUERY = "project = "+JIRA_PROJECT+" AND created >'-1m'";
+	public final String FROM_STATUS = PropertiesCache.getInstance().getProperty("from_status");
+	public final String TO_STATUS = PropertiesCache.getInstance().getProperty("to_status");
+	public final String LAPSE_TIME = PropertiesCache.getInstance().getProperty("lapse_time");
+
+	
+	public final String JQL_MODIFIED_ISSUES_QUERY = "project = "+JIRA_PROJECT+" AND updated > '-1m' AND created < '-1m' and not status changed during (-"+LAPSE_TIME+",now())";
+//	public final String JQL_CREATED_ISSUES_QUERY = "project = "+JIRA_PROJECT+" AND created >'-1m'";
+	public final String JQL_CREATED_ISSUES_QUERY = "project="+JIRA_PROJECT+" and status changed FROM '"+FROM_STATUS+"' TO '"+TO_STATUS+"' DURING (-"+LAPSE_TIME+",now())";
 
 	public final String OSLC_PROPERTIES_DCTERMS_TITLE = "?oslc.properties=dcterms:title";
 	public final String RTC_FILED_AGAINST = "filedAgainst";
@@ -51,5 +57,9 @@ public interface OSLCConstants {
 	public final String JIRA_TYPE_RESOLUTION = "Resolution";
 	public final String JIRA_TYPE_CUSTOM_FIELD = "Custom";
 	String SYNC_FIELDS = "sync_fields";
+	String CUST_FIELDS = "custom_fields";
+
+	public final String STRING_CUSTOM_FIELD_ACCEPTANCE_CRITERIA = "Acceptance Criteria";
+	public final String ACCEPTANCE_CRITERIA = "Acceptance Criteria";
 
 }
